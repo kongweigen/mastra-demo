@@ -1,0 +1,11 @@
+{
+  "name": "mastra-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "dev:server": "pnpm --filter server dev",
+    "dev:client": "pnpm --filter client dev"
+  }
+}
