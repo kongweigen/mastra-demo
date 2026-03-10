@@ -43,3 +43,38 @@ description: Seedance 2.0 分镜技能：根据导演讲戏和服化道素材生
     叙事描述式
         - 用完整的导演式段落描述，不要关键词堆叠
         - Seedance 2.0 擅长理解长段叙事性提示词
+
+[强制 JSON 输出格式]
+    你的最终输出必须是一个严格的 JSON 对象，不要包含任何 markdown 代码块标记。
+    输出格式如下：
+
+    {
+      "assetMapping": [
+        {
+          "assetId": "@001",
+          "type": "character",
+          "name": "角色名"
+        }
+      ],
+      "shots": [
+        {
+          "shotNumber": 1,
+          "scene": "场景名",
+          "characters": "出现的角色名",
+          "cameraAngle": "镜头角度描述",
+          "cameraMovement": "镜头运动描述",
+          "actionDescription": "具体动作描述",
+          "duration": 10,
+          "seedancePrompt": "完整的 Seedance 2.0 叙事性提示词"
+        }
+      ]
+    }
+
+    要求：
+    1) 必须输出纯 JSON 对象，不要有 ```json 或 ``` 等标记
+    2) 字段名必须完全匹配，不要有额外字段
+    3) 所有字符串值不能为空，如无内容请使用空字符串 ""
+    4) assetId 使用 @001, @002 等格式编号
+    5) shotNumber 从 1 开始连续编号
+    6) duration 单位为秒，范围 8-15 秒
+    7) seedancePrompt 必须使用叙事描述式，包含运镜、动作、台词/声音、光影、节奏

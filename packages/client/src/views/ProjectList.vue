@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import ModelSwitcher from '@/components/ModelSwitcher.vue';
 import { useProjectStore } from '@/stores/project';
 
 const router = useRouter();
@@ -71,7 +70,6 @@ function getStatusClass(status: string) {
     <header class="header">
       <h1>短剧分镜生成系统</h1>
       <div class="header-actions">
-        <ModelSwitcher />
         <button class="btn btn-primary" @click="showCreateModal = true">新建项目</button>
       </div>
     </header>

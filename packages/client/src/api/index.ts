@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Project, Phase, ModelSettings } from '@/types';
+import type { Project, Phase, ModelSettings, ManagedAgent, ManagedSkill, StudioBootstrap } from '@/types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -48,4 +48,24 @@ export const settingsApi = {
 
   updateModel: (model: string) =>
     api.patch<ModelSettings>('/settings/model', { model }).then((res) => res.data),
+};
+
+export const studioApi = {
+  bootstrap: () => api.get<StudioBootstrap>('/studio/bootstrap').then((res) => res.data),
+
+  listSkills: () => api.get<ManagedSkill[]>('/studio/skills').then((res) => res.data),
+
+  createSkill: (data: { name: string; description: string; instructions: string }) =>
+    api.post<ManagedSkill>('/studio/skills', data).then((res) => res.data),
+
+  updateSkill: (name: string, data: { description?: string; instructions?: string }) =>
+    api.put<ManagedSkill>(`/studio/skills/${encodeURIComponent(name)}`, data).then((res) => res.data),
+
+  listAgents: () => api.get<ManagedAgent[]>('/studio/agents').then((res) => res.data),
+
+  createAgent: (data: Omit<ManagedAgent, 'id' | 'updatedAt'> & { key?: string }) =>
+    api.post<ManagedAgent>('/studio/agents', data).then((res) => res.data),
+
+  updateAgent: (id: string, data: Partial<Omit<ManagedAgent, 'id' | 'updatedAt'>>) =>
+    api.put<ManagedAgent>(`/studio/agents/${encodeURIComponent(id)}`, data).then((res) => res.data),
 };

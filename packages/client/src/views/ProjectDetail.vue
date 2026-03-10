@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import ModelSwitcher from '@/components/ModelSwitcher.vue';
 import { useProjectStore } from '@/stores/project';
 
 const route = useRoute();
@@ -102,6 +101,26 @@ function getReviewSection(phase: { review_comments: string }, stage: 'business' 
   const parsed = parseReviewComments(phase.review_comments);
   const section = parsed[stage];
   return section && typeof section === 'object' ? section : null;
+}
+
+function formatAny(value: unknown) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function getReviewSummary(section: any) {
+  const summary = typeof section?.summary === 'string' ? section.summary.trim() : '';
+  if (summary) return summary;
+
+  const raw = section?.raw;
+  if (raw) return formatAny(raw);
+
+  return '暂无摘要';
 }
 
 function inferReviewResultFromText(value: unknown): 'PASS' | 'FAIL' | undefined {
@@ -236,6 +255,51 @@ function getDecisionFeedback(phaseId: string, serverNote?: string) {
   return decisionFeedbackByPhase.value[phaseId] || serverNote || '';
 }
 
+function parsePhaseOutput(outputData: string) {
+  try {
+    const parsed = JSON.parse(outputData);
+    // Handle envelope format
+    if (parsed.schemaVersion === 1 && parsed.data) {
+      return parsed.data;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function getPhase1Output(output: any) {
+  return {
+    plotBreakdown: output?.plotBreakdown || output?.剧情拆解 || [],
+    characters: output?.characters || output?.人物清单 || [],
+    scenes: output?.scenes || output?.场景清单 || [],
+  };
+}
+
+function getPhase2Output(output: any) {
+  return {
+    characterStyles: output?.characterStyles || output?.人物造型 || [],
+    sceneEnvironments: output?.sceneEnvironments || output?.场景环境 || [],
+  };
+}
+
+function getPhase3Output(output: any) {
+  return {
+    assetMapping: output?.assetMapping || output?.素材对应表 || [],
+    shots: output?.shots || output?.分镜列表 || [],
+  };
+}
+
+function getFormattedOutput(phaseNumber: number, outputData: string) {
+  const output = parsePhaseOutput(outputData);
+  if (!output) return null;
+
+  if (phaseNumber === 1) return getPhase1Output(output);
+  if (phaseNumber === 2) return getPhase2Output(output);
+  if (phaseNumber === 3) return getPhase3Output(output);
+  return null;
+}
+
 </script>
 
 <template>
@@ -246,7 +310,6 @@ function getDecisionFeedback(phaseId: string, serverNote?: string) {
         <h1>{{ store.currentProject?.title || '加载中...' }}</h1>
       </div>
       <div class="header-right">
-        <ModelSwitcher />
         <div class="header-status">
           <span
             class="status-badge"
@@ -403,7 +466,7 @@ function getDecisionFeedback(phaseId: string, serverNote?: string) {
                       {{ isReviewTextExpanded(phase.id, 'business') ? '收起文本' : '展开文本' }}
                     </button>
                   </div>
-                  <p v-if="isReviewTextExpanded(phase.id, 'business')">{{ getReviewSection(phase, 'business')?.summary || '暂无摘要' }}</p>
+                  <p v-if="isReviewTextExpanded(phase.id, 'business')">{{ getReviewSummary(getReviewSection(phase, 'business')) }}</p>
                 </div>
                 <div v-if="getReviewSection(phase, 'compliance')" class="review-section">
                   <div class="review-section-header">
@@ -413,7 +476,7 @@ function getDecisionFeedback(phaseId: string, serverNote?: string) {
                       {{ isReviewTextExpanded(phase.id, 'compliance') ? '收起文本' : '展开文本' }}
                     </button>
                   </div>
-                  <p v-if="isReviewTextExpanded(phase.id, 'compliance')">{{ getReviewSection(phase, 'compliance')?.summary || '暂无摘要' }}</p>
+                  <p v-if="isReviewTextExpanded(phase.id, 'compliance')">{{ getReviewSummary(getReviewSection(phase, 'compliance')) }}</p>
                 </div>
                 <textarea
                   v-model="decisionNoteByPhase[phase.id]"
@@ -444,7 +507,103 @@ function getDecisionFeedback(phaseId: string, serverNote?: string) {
                 <button class="text-toggle" @click="toggleResultExpanded(phase.id)">
                   {{ isResultExpanded(phase.id) ? '收起结果' : '展开结果' }}
                 </button>
-                <pre v-if="isResultExpanded(phase.id)" class="output-data">{{ formatJSON(phase.output_data) }}</pre>
+
+                <div v-if="isResultExpanded(phase.id)" class="formatted-output">
+                  <!-- Phase 1: 剧本分析 -->
+                  <template v-if="phase.phase_number === 1">
+                    <div v-if="getFormattedOutput(1, phase.output_data)?.plotBreakdown?.length" class="output-section">
+                      <h5>剧情拆解</h5>
+                      <div v-for="(item, idx) in getFormattedOutput(1, phase.output_data).plotBreakdown" :key="'pb-'+idx" class="card-item">
+                        <div class="card-header">
+                          <span class="card-title">第 {{ item.episode || item.集数 }} 集</span>
+                          <span class="card-duration">{{ item.estimatedDuration || item.预计时长 || 0 }}s</span>
+                        </div>
+                        <p><strong>剧情点：</strong>{{ item.plotPoint || item.剧情点 }}</p>
+                        <p><strong>核心冲突：</strong>{{ item.coreConflict || item.核心冲突 }}</p>
+                        <p><strong>情感走向：</strong>{{ item.emotionalArc || item.情感走向 }}</p>
+                        <p><strong>导演阐述：</strong>{{ item.directorNotes || item.导演阐述 }}</p>
+                      </div>
+                    </div>
+                    <div v-if="getFormattedOutput(1, phase.output_data)?.characters?.length" class="output-section">
+                      <h5>人物清单</h5>
+                      <div class="cards-grid">
+                        <div v-for="(char, idx) in getFormattedOutput(1, phase.output_data).characters" :key="'char-'+idx" class="mini-card">
+                          <div class="mini-card-title">{{ char.name || char.姓名 }}</div>
+                          <div class="mini-card-meta">{{ char.age || char.年龄 }}</div>
+                          <div class="mini-card-content">{{ char.appearance || char.外观关键词 }}</div>
+                          <span class="status-tag" :class="'status-' + (char.status || char.素材状态)">{{ char.status || char.素材状态 }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-if="getFormattedOutput(1, phase.output_data)?.scenes?.length" class="output-section">
+                      <h5>场景清单</h5>
+                      <div class="cards-grid">
+                        <div v-for="(scene, idx) in getFormattedOutput(1, phase.output_data).scenes" :key="'scene-'+idx" class="mini-card">
+                          <div class="mini-card-title">{{ scene.name || scene.场景名称 }}</div>
+                          <div class="mini-card-meta">{{ scene.timeOfDay || scene.时间 }}</div>
+                          <div class="mini-card-content">{{ scene.lightingTone || scene.lightingTone || scene.光线色调 }}</div>
+                          <span class="status-tag" :class="'status-' + (scene.status || scene.素材状态)">{{ scene.status || scene.素材状态 }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- Phase 2: 服化道设计 -->
+                  <template v-if="phase.phase_number === 2">
+                    <div v-if="getFormattedOutput(2, phase.output_data)?.characterStyles?.length" class="output-section">
+                      <h5>人物造型</h5>
+                      <div v-for="(style, idx) in getFormattedOutput(2, phase.output_data).characterStyles" :key="'style-'+idx" class="card-item">
+                        <div class="card-header">
+                          <span class="card-title">{{ style.name }}</span>
+                        </div>
+                        <div class="prompt-box">{{ style.prompt }}</div>
+                      </div>
+                    </div>
+                    <div v-if="getFormattedOutput(2, phase.output_data)?.sceneEnvironments?.length" class="output-section">
+                      <h5>场景环境</h5>
+                      <div v-for="(env, idx) in getFormattedOutput(2, phase.output_data).sceneEnvironments" :key="'env-'+idx" class="card-item">
+                        <div class="card-header">
+                          <span class="card-title">{{ env.name }}</span>
+                        </div>
+                        <div class="prompt-box">{{ env.prompt }}</div>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- Phase 3: 分镜生成 -->
+                  <template v-if="phase.phase_number === 3">
+                    <div v-if="getFormattedOutput(3, phase.output_data)?.assetMapping?.length" class="output-section">
+                      <h5>素材对应表</h5>
+                      <table class="data-table">
+                        <thead>
+                          <tr><th>ID</th><th>类型</th><th>名称</th></tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(asset, idx) in getFormattedOutput(3, phase.output_data).assetMapping" :key="'asset-'+idx">
+                            <td>{{ asset.assetId || asset.素材ID }}</td>
+                            <td>{{ asset.type || asset.类型 }}</td>
+                            <td>{{ asset.name || asset.名称 }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                    <div v-if="getFormattedOutput(3, phase.output_data)?.shots?.length" class="output-section">
+                      <h5>分镜列表</h5>
+                      <div v-for="(shot, idx) in getFormattedOutput(3, phase.output_data).shots" :key="'shot-'+idx" class="card-item">
+                        <div class="card-header">
+                          <span class="card-title">镜头 {{ shot.shotNumber || shot.分镜号 }}</span>
+                          <span class="card-duration">{{ shot.duration || shot.时长 }}s</span>
+                        </div>
+                        <p><strong>场景：</strong>{{ shot.scene }}</p>
+                        <p><strong>人物：</strong>{{ shot.characters || shot.人物 }}</p>
+                        <p><strong>镜头角度：</strong>{{ shot.cameraAngle || shot.镜头角度 }}</p>
+                        <p><strong>镜头运动：</strong>{{ shot.cameraMovement || shot.镜头运动 }}</p>
+                        <p><strong>动作要点：</strong>{{ shot.actionDescription || shot.动作要点 }}</p>
+                        <div class="prompt-box"><strong>Seedance：</strong>{{ shot.seedancePrompt || shot.seedance提示词 }}</div>
+                      </div>
+                    </div>
+                  </template>
+                </div>
               </div>
               <p v-else class="output-empty">暂无产出</p>
             </div>
@@ -517,6 +676,7 @@ function getDecisionFeedback(phaseId: string, serverNote?: string) {
   cursor: pointer;
   font-size: 14px;
 }
+
 
 .btn-back:hover {
   color: #2563eb;
@@ -857,6 +1017,140 @@ function getDecisionFeedback(phaseId: string, serverNote?: string) {
 .output-empty {
   color: #94a3b8;
   font-size: 14px;
+}
+
+.formatted-output {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.output-section h5 {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.card-item {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.card-item p {
+  margin: 4px 0;
+  font-size: 13px;
+  color: #475569;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.card-title {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.card-duration {
+  font-size: 12px;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.mini-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  position: relative;
+}
+
+.mini-card-title {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 14px;
+}
+
+.mini-card-meta {
+  font-size: 12px;
+  color: #64748b;
+  margin: 4px 0;
+}
+
+.mini-card-content {
+  font-size: 12px;
+  color: #475569;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.status-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.status-tag.status-new, .status-tag.status-新增 {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.status-tag.status-reuse, .status-tag.status-复用 {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.status-tag.status-variant, .status-tag.status-变体 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.prompt-box {
+  background: #fef3c7;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #92400e;
+  margin-top: 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th, .data-table td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.data-table th {
+  background: #f8fafc;
+  font-weight: 600;
 }
 
 .shots-grid {

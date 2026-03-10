@@ -78,3 +78,99 @@ export interface ModelSettings {
   model: string;
   availableModels: string[];
 }
+
+export interface ManagedSkill {
+  name: string;
+  description: string;
+  instructions: string;
+  path: string;
+}
+
+export interface ManagedAgent {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  instructions: string;
+  phaseNumber: 1 | 2 | 3 | null;
+  skillNames: string[];
+  updatedAt: string;
+}
+
+export interface StudioBootstrap {
+  agents: ManagedAgent[];
+  skills: ManagedSkill[];
+}
+
+// ============================================
+// 阶段输出 JSON 类型定义 (英文 Key)
+// ============================================
+
+export type MaterialStatus = 'new' | 'reuse' | 'variant';
+
+export interface Phase1PlotPoint {
+  episode: number;
+  plotPoint: string;
+  coreConflict: string;
+  emotionalArc: string;
+  directorNotes: string;
+  estimatedDuration: number;
+}
+
+export interface Phase1Character {
+  name: string;
+  age: string;
+  appearance: string;
+  status: MaterialStatus;
+}
+
+export interface Phase1Scene {
+  name: string;
+  timeOfDay: string;
+  lightingTone: string;
+  atmosphere: string;
+  status: MaterialStatus;
+}
+
+export interface Phase1Output {
+  plotBreakdown: Phase1PlotPoint[];
+  characters: Phase1Character[];
+  scenes: Phase1Scene[];
+}
+
+export interface Phase2CharacterStyle {
+  name: string;
+  prompt: string;
+}
+
+export interface Phase2SceneEnvironment {
+  name: string;
+  prompt: string;
+}
+
+export interface Phase2Output {
+  characterStyles: Phase2CharacterStyle[];
+  sceneEnvironments: Phase2SceneEnvironment[];
+}
+
+export interface Phase3Asset {
+  assetId: string;
+  type: 'character' | 'scene';
+  name: string;
+}
+
+export interface Phase3Shot {
+  shotNumber: number;
+  scene: string;
+  characters: string;
+  cameraAngle: string;
+  cameraMovement: string;
+  actionDescription: string;
+  duration: number;
+  seedancePrompt: string;
+}
+
+export interface Phase3Output {
+  assetMapping: Phase3Asset[];
+  shots: Phase3Shot[];
+}

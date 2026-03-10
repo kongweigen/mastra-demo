@@ -3,10 +3,11 @@ import cors from 'cors';
 import { projectsRouter } from './routes/projects.js';
 import { phasesRouter } from './routes/phases.js';
 import { settingsRouter } from './routes/settings.js';
+import { studioRouter } from './routes/studio.js';
 import { sseRouter } from './routes/sse.js';
 import { runPhase } from './agent-service.js';
 import { logWorkspaceSkillsStatus } from './lib/mastra.js';
-import { logDirectorAgentStatus } from './lib/director-agent.js';
+import { listManagedAgents } from './lib/studio-config.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -19,6 +20,7 @@ app.use(express.json());
 app.use('/api/projects', projectsRouter);
 app.use('/api/phases', phasesRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/studio', studioRouter);
 app.use('/api/sse', sseRouter);
 
 // 运行阶段
@@ -50,7 +52,15 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
   logWorkspaceSkillsStatus('server-startup');
-  logDirectorAgentStatus('server-startup');
+  listManagedAgents()
+    .then((agents) => {
+      console.info(
+        `[Studio][server-startup] managedAgents=${agents.length} keys=${agents.map((agent) => `${agent.key}:${agent.phaseNumber ?? 'custom'}`).join(', ')}`
+      );
+    })
+    .catch((error) => {
+      console.error('[Studio][server-startup] failed to inspect managed agents', error);
+    });
 });
 
 export { app };
