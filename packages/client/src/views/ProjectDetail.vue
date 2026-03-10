@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import ModelSwitcher from '@/components/ModelSwitcher.vue';
 import { useProjectStore } from '@/stores/project';
 
 const route = useRoute();
@@ -11,6 +12,12 @@ const projectId = computed(() => route.params.id as string);
 const activeTab = ref<'script' | 'output' | 'shots'>('script');
 const editedScript = ref('');
 const isSaving = ref(false);
+const decisionLoadingByPhase = ref<Record<string, boolean>>({});
+const reviewPanelExpandedByPhase = ref<Record<string, boolean>>({});
+const resultExpandedByPhase = ref<Record<string, boolean>>({});
+const reviewTextExpanded = ref<Record<string, boolean>>({});
+const decisionNoteByPhase = ref<Record<string, string>>({});
+const decisionFeedbackByPhase = ref<Record<string, string>>({});
 
 onMounted(async () => {
   await store.fetchProject(projectId.value);
@@ -47,11 +54,27 @@ async function runPhase(phase: number) {
 }
 
 async function updatePhaseDecision(phaseId: string, decision: 'confirmed' | 'needs_optimization') {
-  await store.updatePhaseDecision(
-    phaseId,
-    decision,
-    decision === 'confirmed' ? '用户确认当前审核结果' : '用户选择需要继续优化'
-  );
+  decisionLoadingByPhase.value[phaseId] = true;
+
+  try {
+    const note = decisionNoteByPhase.value[phaseId]?.trim();
+    await store.updatePhaseDecision(
+      phaseId,
+      decision,
+      note || (decision === 'confirmed' ? '用户确认当前审核结果' : '用户选择需要继续优化')
+    );
+
+    decisionFeedbackByPhase.value[phaseId] =
+      decision === 'confirmed' ? '已确认当前审核结果，审核模块已收起。' : '已标记为需要优化，请根据反馈继续修改后重新执行。';
+
+    if (decision === 'confirmed') {
+      reviewPanelExpandedByPhase.value[phaseId] = false;
+    } else {
+      reviewPanelExpandedByPhase.value[phaseId] = true;
+    }
+  } finally {
+    decisionLoadingByPhase.value[phaseId] = false;
+  }
 }
 
 function goBack() {
@@ -81,6 +104,48 @@ function getReviewSection(phase: { review_comments: string }, stage: 'business' 
   return section && typeof section === 'object' ? section : null;
 }
 
+function inferReviewResultFromText(value: unknown): 'PASS' | 'FAIL' | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  const normalized = text.toUpperCase();
+
+  if (
+    /业务审核[:：]\s*FAIL/.test(text) ||
+    /合规审核[:：]\s*FAIL/.test(text) ||
+    /审核结果[:：]\s*FAIL/.test(text) ||
+    /\bFAIL\b/.test(normalized) ||
+    /未通过/.test(text) ||
+    /不通过/.test(text) ||
+    /需要修改/.test(text)
+  ) {
+    return 'FAIL';
+  }
+
+  if (
+    /业务审核[:：]\s*PASS/.test(text) ||
+    /合规审核[:：]\s*PASS/.test(text) ||
+    /审核结果[:：]\s*PASS/.test(text) ||
+    /\bPASS\b/.test(normalized) ||
+    /通过/.test(text)
+  ) {
+    return 'PASS';
+  }
+
+  return undefined;
+}
+
+function getResolvedReviewResult(section: any): 'PASS' | 'FAIL' | undefined {
+  return (
+    inferReviewResultFromText(section?.raw) ||
+    inferReviewResultFromText(section?.summary) ||
+    inferReviewResultFromText(section?.result) ||
+    (section?.result === 'PASS' || section?.result === 'FAIL' ? section.result : undefined)
+  );
+}
+
 function getReviewResultText(result?: string) {
   return result === 'PASS' ? '通过' : result === 'FAIL' ? '未通过' : '待审核';
 }
@@ -96,7 +161,7 @@ function getDecisionText(decision?: string) {
 
 function getPhaseStatus(phaseNum: number) {
   const phase = store.currentProject?.phases?.find((p) => p.phase_number === phaseNum);
-  return phase?.review_status || 'pending';
+  return phase ? getEffectiveReviewStatus(phase) : 'pending';
 }
 
 function getPhaseDecision(phaseNum: number) {
@@ -115,6 +180,62 @@ function getReviewStatusText(status: string) {
   return map[status] || status;
 }
 
+function getEffectiveReviewStatus(phase: { review_status: string; review_comments: string }) {
+  const business = getResolvedReviewResult(getReviewSection(phase, 'business'));
+  const compliance = getResolvedReviewResult(getReviewSection(phase, 'compliance'));
+
+  if (compliance === 'FAIL') {
+    return 'compliance_fail';
+  }
+
+  if (compliance === 'PASS') {
+    return 'compliance_pass';
+  }
+
+  if (business === 'FAIL') {
+    return 'business_fail';
+  }
+
+  if (business === 'PASS') {
+    return 'business_pass';
+  }
+
+  return phase.review_status || 'pending';
+}
+
+function isReviewPanelExpanded(phaseId: string, decision?: string) {
+  return reviewPanelExpandedByPhase.value[phaseId] ?? decision !== 'confirmed';
+}
+
+function toggleReviewPanel(phaseId: string) {
+  reviewPanelExpandedByPhase.value[phaseId] = !isReviewPanelExpanded(phaseId);
+}
+
+function isResultExpanded(phaseId: string) {
+  return resultExpandedByPhase.value[phaseId] ?? false;
+}
+
+function toggleResultExpanded(phaseId: string) {
+  resultExpandedByPhase.value[phaseId] = !isResultExpanded(phaseId);
+}
+
+function getReviewTextKey(phaseId: string, stage: 'business' | 'compliance') {
+  return `${phaseId}:${stage}`;
+}
+
+function isReviewTextExpanded(phaseId: string, stage: 'business' | 'compliance') {
+  return reviewTextExpanded.value[getReviewTextKey(phaseId, stage)] ?? false;
+}
+
+function toggleReviewTextExpanded(phaseId: string, stage: 'business' | 'compliance') {
+  const key = getReviewTextKey(phaseId, stage);
+  reviewTextExpanded.value[key] = !isReviewTextExpanded(phaseId, stage);
+}
+
+function getDecisionFeedback(phaseId: string, serverNote?: string) {
+  return decisionFeedbackByPhase.value[phaseId] || serverNote || '';
+}
+
 </script>
 
 <template>
@@ -124,13 +245,16 @@ function getReviewStatusText(status: string) {
         <button class="btn-back" @click="goBack">← 返回</button>
         <h1>{{ store.currentProject?.title || '加载中...' }}</h1>
       </div>
-      <div class="header-status">
-        <span
-          class="status-badge"
-          :class="`status-${store.currentProject?.status}`"
-        >
-          {{ store.currentProject?.status === 'running' ? '进行中' : store.currentProject?.status === 'completed' ? '已完成' : store.currentProject?.status === 'failed' ? '失败' : '待开始' }}
-        </span>
+      <div class="header-right">
+        <ModelSwitcher />
+        <div class="header-status">
+          <span
+            class="status-badge"
+            :class="`status-${store.currentProject?.status}`"
+          >
+            {{ store.currentProject?.status === 'running' ? '进行中' : store.currentProject?.status === 'completed' ? '已完成' : store.currentProject?.status === 'failed' ? '失败' : '待开始' }}
+          </span>
+        </div>
       </div>
     </header>
 
@@ -257,42 +381,71 @@ function getReviewStatusText(status: string) {
             <div v-for="phase in store.currentProject?.phases" :key="phase.id" class="output-item">
               <h4>阶段 {{ phase.phase_number }}: {{ phase.name }}</h4>
               <div class="output-status">
-                <span :class="`review-badge ${phase.review_status}`">
-                  {{ getReviewStatusText(phase.review_status) }}
+                <span :class="`review-badge ${getEffectiveReviewStatus(phase)}`">
+                  {{ getReviewStatusText(getEffectiveReviewStatus(phase)) }}
                 </span>
                 <span class="decision-badge" :class="`decision-${phase.review_decision}`">
                   {{ getDecisionText(phase.review_decision) }}
                 </span>
+                <button class="text-toggle" @click="toggleReviewPanel(phase.id)">
+                  {{ isReviewPanelExpanded(phase.id, phase.review_decision) ? '收起审核' : '展开审核' }}
+                </button>
               </div>
-              <div v-if="getReviewSection(phase, 'business') || getReviewSection(phase, 'compliance')" class="review-panel">
+              <div
+                v-if="(getReviewSection(phase, 'business') || getReviewSection(phase, 'compliance')) && isReviewPanelExpanded(phase.id, phase.review_decision)"
+                class="review-panel"
+              >
                 <div v-if="getReviewSection(phase, 'business')" class="review-section">
-                  <strong>业务审核：</strong>
-                  <span>{{ getReviewResultText(getReviewSection(phase, 'business')?.result) }}</span>
-                  <p>{{ getReviewSection(phase, 'business')?.summary || '暂无摘要' }}</p>
+                  <div class="review-section-header">
+                    <strong>业务审核：</strong>
+                    <span>{{ getReviewResultText(getResolvedReviewResult(getReviewSection(phase, 'business'))) }}</span>
+                    <button class="text-toggle" @click="toggleReviewTextExpanded(phase.id, 'business')">
+                      {{ isReviewTextExpanded(phase.id, 'business') ? '收起文本' : '展开文本' }}
+                    </button>
+                  </div>
+                  <p v-if="isReviewTextExpanded(phase.id, 'business')">{{ getReviewSection(phase, 'business')?.summary || '暂无摘要' }}</p>
                 </div>
                 <div v-if="getReviewSection(phase, 'compliance')" class="review-section">
-                  <strong>合规审核：</strong>
-                  <span>{{ getReviewResultText(getReviewSection(phase, 'compliance')?.result) }}</span>
-                  <p>{{ getReviewSection(phase, 'compliance')?.summary || '暂无摘要' }}</p>
+                  <div class="review-section-header">
+                    <strong>合规审核：</strong>
+                    <span>{{ getReviewResultText(getResolvedReviewResult(getReviewSection(phase, 'compliance'))) }}</span>
+                    <button class="text-toggle" @click="toggleReviewTextExpanded(phase.id, 'compliance')">
+                      {{ isReviewTextExpanded(phase.id, 'compliance') ? '收起文本' : '展开文本' }}
+                    </button>
+                  </div>
+                  <p v-if="isReviewTextExpanded(phase.id, 'compliance')">{{ getReviewSection(phase, 'compliance')?.summary || '暂无摘要' }}</p>
                 </div>
+                <textarea
+                  v-model="decisionNoteByPhase[phase.id]"
+                  class="decision-note"
+                  placeholder="补充人工反馈，确认可留空；选择需要优化时建议填写具体修改意见"
+                ></textarea>
                 <div class="review-actions">
                   <button
                     class="btn btn-primary"
-                    :disabled="store.isRunning"
+                    :disabled="store.isRunning || decisionLoadingByPhase[phase.id]"
                     @click="updatePhaseDecision(phase.id, 'confirmed')"
                   >
-                    确认结果
+                    {{ decisionLoadingByPhase[phase.id] ? '提交中...' : '确认结果' }}
                   </button>
                   <button
                     class="btn btn-secondary"
-                    :disabled="store.isRunning"
+                    :disabled="store.isRunning || decisionLoadingByPhase[phase.id]"
                     @click="updatePhaseDecision(phase.id, 'needs_optimization')"
                   >
                     需要优化
                   </button>
                 </div>
+                <p v-if="getDecisionFeedback(phase.id, phase.review_decision_note)" class="decision-feedback">
+                  {{ getDecisionFeedback(phase.id, phase.review_decision_note) }}
+                </p>
               </div>
-              <pre v-if="phase.output_data" class="output-data">{{ formatJSON(phase.output_data) }}</pre>
+              <div v-if="phase.output_data" class="result-panel">
+                <button class="text-toggle" @click="toggleResultExpanded(phase.id)">
+                  {{ isResultExpanded(phase.id) ? '收起结果' : '展开结果' }}
+                </button>
+                <pre v-if="isResultExpanded(phase.id)" class="output-data">{{ formatJSON(phase.output_data) }}</pre>
+              </div>
               <p v-else class="output-empty">暂无产出</p>
             </div>
 
@@ -340,6 +493,7 @@ function getReviewStatusText(status: string) {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -347,6 +501,13 @@ function getReviewStatusText(status: string) {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .btn-back {
@@ -602,6 +763,7 @@ function getReviewStatusText(status: string) {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
   margin-bottom: 12px;
 }
 
@@ -615,6 +777,13 @@ function getReviewStatusText(status: string) {
 
 .review-section + .review-section {
   margin-top: 10px;
+}
+
+.review-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .review-section strong {
@@ -633,6 +802,44 @@ function getReviewStatusText(status: string) {
   display: flex;
   gap: 8px;
   margin-top: 12px;
+}
+
+.decision-note {
+  width: 100%;
+  min-height: 84px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  resize: vertical;
+  font: inherit;
+  color: #0f172a;
+}
+
+.decision-feedback {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #0f766e;
+  white-space: pre-wrap;
+}
+
+.text-toggle {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.text-toggle:hover {
+  color: #1d4ed8;
+}
+
+.result-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .output-data {

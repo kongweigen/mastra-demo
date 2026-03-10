@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Project, Phase } from '@/types';
+import type { Project, Phase, ModelSettings } from '@/types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -41,4 +41,11 @@ export const sseApi = {
     eventSource.onmessage = onMessage;
     return eventSource;
   },
+};
+
+export const settingsApi = {
+  getModel: () => api.get<ModelSettings>('/settings/model').then((res) => res.data),
+
+  updateModel: (model: string) =>
+    api.patch<ModelSettings>('/settings/model', { model }).then((res) => res.data),
 };

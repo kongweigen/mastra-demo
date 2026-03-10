@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { projectsRouter } from './routes/projects.js';
 import { phasesRouter } from './routes/phases.js';
+import { settingsRouter } from './routes/settings.js';
 import { sseRouter } from './routes/sse.js';
 import { runPhase } from './agent-service.js';
 import { logWorkspaceSkillsStatus } from './lib/mastra.js';
@@ -17,6 +18,7 @@ app.use(express.json());
 // 路由
 app.use('/api/projects', projectsRouter);
 app.use('/api/phases', phasesRouter);
+app.use('/api/settings', settingsRouter);
 app.use('/api/sse', sseRouter);
 
 // 运行阶段

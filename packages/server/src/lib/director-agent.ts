@@ -36,11 +36,11 @@ export const directorAgent = new Agent({
   name: 'Director Agent',
   description: '影视制作导演 Agent，自动调用 workspace skills 完成执行与审核任务。',
   instructions: DIRECTOR_AGENT_INSTRUCTIONS,
-  model: {
+  model: () => ({
     id: `chatfire/${CHATFIRE_CONFIG.model}`,
     url: `${CHATFIRE_CONFIG.baseUrl}/v1`,
     apiKey: CHATFIRE_CONFIG.apiKey,
-  },
+  }),
   workspace,
 });
 

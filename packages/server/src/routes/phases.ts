@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import * as db from '../db/index.js';
+import { runPhase } from '../agent-service.js';
+import { emitEvent } from './sse.js';
 
 export const phasesRouter = Router();
 
@@ -61,8 +63,33 @@ phasesRouter.patch('/:id/decision', (req, res) => {
       return res.status(400).json({ error: 'Invalid decision' });
     }
 
+    console.info(
+      `[PhaseDecision] phaseId=${req.params.id} projectId=${phase.project_id} phase=${phase.phase_number} decision=${decision}`
+    );
     db.updatePhaseDecision(req.params.id, decision, note || '');
-    res.json(db.getPhase(req.params.id));
+    const updatedPhase = db.getPhase(req.params.id);
+
+    emitEvent(phase.project_id, {
+      type: 'phase_decision',
+      phase: phase.phase_number,
+      phaseId: phase.id,
+      decision,
+      message:
+        decision === 'confirmed'
+          ? '已确认当前审核结果'
+          : decision === 'needs_optimization'
+            ? '已标记为需要优化，准备重新执行当前阶段'
+            : '已重置人工决策状态',
+      note: note || '',
+    });
+
+    if (decision === 'needs_optimization') {
+      runPhase(phase.project_id, phase.phase_number).catch((error) => {
+        console.error(`[PhaseDecision] failed to rerun phase ${phase.phase_number} for project ${phase.project_id}`, error);
+      });
+    }
+
+    res.json(updatedPhase);
   } catch (error) {
     console.error('Error updating phase decision:', error);
     res.status(500).json({ error: 'Failed to update phase decision' });

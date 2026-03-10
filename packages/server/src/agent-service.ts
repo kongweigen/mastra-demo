@@ -164,6 +164,78 @@ type ReviewPayload = {
   latestStage?: 'business' | 'compliance';
 };
 
+function extractTextCandidates(raw: any): string[] {
+  if (!raw) {
+    return [];
+  }
+
+  if (typeof raw === 'string') {
+    return [raw];
+  }
+
+  if (typeof raw !== 'object') {
+    return [String(raw)];
+  }
+
+  return Object.values(raw)
+    .flatMap((value) => extractTextCandidates(value))
+    .filter(Boolean);
+}
+
+function inferReviewResult(raw: any): 'PASS' | 'FAIL' {
+  const directCandidates = [
+    raw?.审核结果,
+    raw?.result,
+    raw?.status,
+    raw?.结论,
+    raw?.业务审核,
+    raw?.合规审核,
+  ]
+    .filter((value) => typeof value === 'string')
+    .map((value) => String(value).toUpperCase());
+
+  if (directCandidates.some((value) => value.includes('FAIL'))) {
+    return 'FAIL';
+  }
+
+  if (directCandidates.some((value) => value.includes('PASS'))) {
+    return 'PASS';
+  }
+
+  const text = extractTextCandidates(raw).join('\n');
+  const normalized = text.toUpperCase();
+
+  const failPatterns = [
+    /业务审核[:：]\s*FAIL/,
+    /合规审核[:：]\s*FAIL/,
+    /审核结果[:：]\s*FAIL/,
+    /\bFAIL\b/,
+    /未通过/,
+    /不通过/,
+    /需要修改/,
+    /问题\d+[:：]/,
+  ];
+
+  if (failPatterns.some((pattern) => pattern.test(text) || pattern.test(normalized))) {
+    return 'FAIL';
+  }
+
+  const passPatterns = [
+    /业务审核[:：]\s*PASS/,
+    /合规审核[:：]\s*PASS/,
+    /审核结果[:：]\s*PASS/,
+    /\bPASS\b/,
+    /通过/,
+    /合规/,
+  ];
+
+  if (passPatterns.some((pattern) => pattern.test(text) || pattern.test(normalized))) {
+    return 'PASS';
+  }
+
+  return 'PASS';
+}
+
 function toList(value: unknown): any[] {
   if (Array.isArray(value)) {
     return value;
@@ -209,10 +281,33 @@ function buildReviewSection(raw: any, detailKeys: string[]): ReviewSection {
   const summary = summarizeReviewText(raw) || (details.length > 0 ? JSON.stringify(details) : '');
 
   return {
-    result: raw?.审核结果 === 'FAIL' ? 'FAIL' : 'PASS',
+    result: inferReviewResult(raw),
     summary,
     details,
     raw,
+  };
+}
+
+function parseReviewResponse(reviewResult: string) {
+  try {
+    const jsonMatch = reviewResult.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed && typeof parsed === 'object') {
+        if (!parsed.审核结果) {
+          parsed.审核结果 = inferReviewResult(parsed);
+        }
+        return parsed;
+      }
+    }
+  } catch {
+    // Fall through to text-based normalization below.
+  }
+
+  return {
+    审核结果: inferReviewResult(reviewResult),
+    通过原因: reviewResult,
+    原始审核文本: reviewResult,
   };
 }
 
@@ -264,16 +359,7 @@ ${JSON.stringify(output, null, 2)}
         'scriptAnalysisReviewSkill'
       );
 
-      // 尝试解析审核结果
-      try {
-        const jsonMatch = reviewResult.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-        return { 审核结果: 'PASS', 通过原因: reviewResult };
-      } catch {
-        return { 审核结果: 'PASS', 通过原因: reviewResult };
-      }
+      return parseReviewResponse(reviewResult);
     },
   },
   2: {
@@ -313,15 +399,7 @@ ${JSON.stringify(output, null, 2)}
         'artDirectionReviewSkill'
       );
 
-      try {
-        const jsonMatch = reviewResult.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-        return { 审核结果: 'PASS', 通过原因: reviewResult };
-      } catch {
-        return { 审核结果: 'PASS', 通过原因: reviewResult };
-      }
+      return parseReviewResponse(reviewResult);
     },
   },
   3: {
@@ -366,15 +444,7 @@ ${JSON.stringify(output, null, 2)}
         'seedancePromptReviewSkill'
       );
 
-      try {
-        const jsonMatch = reviewResult.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-        return { 审核结果: 'PASS', 通过原因: reviewResult };
-      } catch {
-        return { 审核结果: 'PASS', 通过原因: reviewResult };
-      }
+      return parseReviewResponse(reviewResult);
     },
   },
 };
@@ -461,8 +531,7 @@ ${JSON.stringify(output, null, 2)}`,
     );
 
     try {
-      const jsonMatch = complianceResultStr.match(/\{[\s\S]*\}/);
-      const complianceResult = jsonMatch ? JSON.parse(jsonMatch[0]) : { 审核结果: 'PASS', 通过原因: complianceResultStr };
+      const complianceResult = parseReviewResponse(complianceResultStr);
       const complianceStatus = complianceResult.审核结果 === 'PASS' ? 'compliance_pass' : 'compliance_fail';
       const latestPhase = db.getPhase(phase.id);
       const complianceSection = buildReviewSection(complianceResult, ['违规列表', '问题列表', '建议列表']);

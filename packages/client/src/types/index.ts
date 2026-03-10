@@ -61,13 +61,20 @@ export interface Shot {
 }
 
 export interface SSEEvent {
-  type: 'phase_start' | 'phase_progress' | 'phase_review' | 'phase_complete' | 'error';
+  type: 'phase_start' | 'phase_progress' | 'phase_review' | 'phase_complete' | 'phase_decision' | 'error';
   phase?: number;
   message?: string;
   status?: string;
   comments?: string;
   phaseId?: string;
+  decision?: 'pending' | 'confirmed' | 'needs_optimization';
+  note?: string;
   reviewStage?: 'business' | 'compliance';
   reviewResult?: 'PASS' | 'FAIL';
   data?: any;
+}
+
+export interface ModelSettings {
+  model: string;
+  availableModels: string[];
 }

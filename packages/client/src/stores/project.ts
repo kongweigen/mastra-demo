@@ -101,6 +101,20 @@ export const useProjectStore = defineStore('project', () => {
           // 刷新项目数据
           fetchProject(projectId);
           break;
+        case 'phase_decision':
+          phaseMessage.value =
+            data.message ||
+            (data.decision === 'confirmed'
+              ? '已确认当前审核结果'
+              : data.decision === 'needs_optimization'
+                ? '已标记为需要优化，正在重新执行当前阶段'
+                : '人工决策已更新');
+          if (data.decision === 'needs_optimization') {
+            isRunning.value = true;
+            currentPhase.value = data.phase || currentPhase.value;
+          }
+          fetchProject(projectId);
+          break;
         case 'phase_complete':
           isRunning.value = false;
           phaseMessage.value = '完成';
