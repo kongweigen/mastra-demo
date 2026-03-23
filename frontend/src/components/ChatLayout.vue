@@ -22,7 +22,7 @@ provide('agentConfig', agentConfig)
 </script>
 
 <template>
-    <main class="flex h-screen flex-col">
+    <main class="flex flex-1 flex-col overflow-hidden">
         <ChatHeader
             :selected-agent="selectedAgent"
             :agent-config="agentConfig()"
