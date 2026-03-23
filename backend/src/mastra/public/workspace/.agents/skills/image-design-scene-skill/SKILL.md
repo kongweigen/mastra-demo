@@ -1,5 +1,5 @@
 ---
-name: image-design-scene
+name: image-design-scene-skill
 description: 场景多角度参考网格图提示词规范（1x3宫格：全景/中景/特写），建立项目场景视觉基调
 version: 2.0.0
 ---

@@ -1,5 +1,5 @@
 ---
-name: style-analysis
+name: style-analysis-skill
 description: 从小说文本中提取内容风格(题材/氛围/色调/环境/节奏)，输出视觉风格描述
 version: 1.0.0
 ---

@@ -1,5 +1,5 @@
 ---
-name: video-kling-v3-omni
+name: video-kling-v3-omni-skill
 description: Kling Omni 视频 Prompt 工程规范（element 主体 + image 宫格图 + 时间线格式）
 model_match:
   - kling-v3-omni

@@ -1,5 +1,5 @@
 ---
-name: editing-patterns
+name: editing-patterns-skill
 description: 分镜/角色/场景编辑操作模式，批量修改策略、字段约束、常见用户意图映射
 version: 1.0.0
 ---

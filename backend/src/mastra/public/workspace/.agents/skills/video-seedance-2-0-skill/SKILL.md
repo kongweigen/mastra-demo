@@ -1,5 +1,5 @@
 ---
-name: video-seedance-2-0
+name: video-seedance-2-0-skill
 description: Seedance 2.0 视频 Prompt 工程规范（多模态参考 + 多镜头叙事 + 原生音频）
 model_match:
   - seedance-2

@@ -1,5 +1,5 @@
 ---
-name: creative-writing
+name: creative-writing-skill
 description: 原创剧本创作能力，用户要求从零写剧本时的创作流程、格式规范、自动建项目
 version: 1.0.0
 ---

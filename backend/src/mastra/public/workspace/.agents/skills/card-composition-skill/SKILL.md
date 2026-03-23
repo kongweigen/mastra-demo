@@ -1,5 +1,5 @@
 ---
-name: card-composition
+name: card-composition-skill
 description: 结构化卡片响应组装指南，何时使用哪种卡片类型、字段填充规则、action 按钮设计
 version: 1.0.0
 ---

@@ -1,5 +1,5 @@
 ---
-name: scene-extraction
+name: scene-extraction-skill
 description: 场景提取规范，全面提取场景环境信息、类型与氛围
 version: 1.0.0
 ---

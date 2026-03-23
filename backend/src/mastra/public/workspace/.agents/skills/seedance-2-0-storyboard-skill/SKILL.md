@@ -1,5 +1,5 @@
 ---
-name: seedance-2-0-storyboard
+name: seedance-2-0-storyboard-skill
 description: Seedance 2.0 分镜规范（15s多镜头 + 多模态参考 + 原生音频）
 model_match:
   - doubao-seedance-2

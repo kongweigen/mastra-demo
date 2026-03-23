@@ -1,5 +1,5 @@
 ---
-name: quality-standards
+name: quality-standards-skill
 description: 资产质量评审标准与关卡决策规则
 version: 1.0.0
 ---

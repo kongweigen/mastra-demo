@@ -1,5 +1,5 @@
 ---
-name: failure-patterns
+name: failure-patterns-skill
 description: 素材生成 + Agent 推理类失败诊断、prompt 改写、模型降级策略
 version: 4.0.0
 ---

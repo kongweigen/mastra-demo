@@ -1,5 +1,5 @@
 ---
-name: character-dedup
+name: character-dedup-skill
 description: 角色去重合并策略，别名识别、字段合并、nameMapping输出
 version: 1.0.0
 ---

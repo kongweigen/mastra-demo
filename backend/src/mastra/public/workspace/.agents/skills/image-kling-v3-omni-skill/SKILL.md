@@ -1,5 +1,5 @@
 ---
-name: image-kling-v3-omni
+name: image-kling-v3-omni-skill
 description: Kling Omni 镜头图片提示词规范（配合 element 主体 + image_list 使用）
 model_match:
   - kling-v3-omni

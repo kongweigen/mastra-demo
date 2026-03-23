@@ -1,5 +1,5 @@
 ---
-name: production-workflow
+name: production-workflow-skill
 description: AI短剧生产全流程指南，DAG阶段顺序、模型适配、前置条件、产出物
 version: 2.0.0
 ---

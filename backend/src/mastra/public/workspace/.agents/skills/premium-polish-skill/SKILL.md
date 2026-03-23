@@ -1,5 +1,5 @@
 ---
-name: premium-polish
+name: premium-polish-skill
 description: PREMIUM精品模式剧本精修规范，在保持原文风格的基础上提升品质
 version: 1.0.0
 ---

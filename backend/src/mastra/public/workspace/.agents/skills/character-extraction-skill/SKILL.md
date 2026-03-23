@@ -1,5 +1,5 @@
 ---
-name: character-extraction
+name: character-extraction-skill
 description: 角色提取规范，提取角色身份、外貌特征、关系网络
 version: 1.0.0
 ---

@@ -1,5 +1,5 @@
 ---
-name: voice-character-matching
+name: voice-character-matching-skill
 description: 角色音色匹配决策指南，按项目配置模型查询音色
 version: 1.0.0
 ---

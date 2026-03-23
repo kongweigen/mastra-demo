@@ -1,5 +1,5 @@
 ---
-name: scene-dedup
+name: scene-dedup-skill
 description: 场景去重合并策略
 version: 1.0.0
 ---

@@ -1,5 +1,5 @@
 ---
-name: image-storyboard-grid
+name: image-storyboard-grid-skill
 description: 宫格图提示词工程规范，将多个镜头画面合成为一张正方形网格图（2x2/3x3/4x4/5x5）
 version: 3.2.0
 ---

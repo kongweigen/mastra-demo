@@ -1,5 +1,5 @@
 ---
-name: first-person-adaptation
+name: first-person-adaptation-skill
 description: 第一人称改写规范，将第三人称剧本转为沉浸式第一人称短剧文案
 version: 1.0.0
 ---

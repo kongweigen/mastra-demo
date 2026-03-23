@@ -1,5 +1,5 @@
 ---
-name: kling-v3-omni-storyboard
+name: kling-v3-omni-storyboard-skill
 description: Kling V3 Omni 分镜规范（镜头组机制 + 口型同步 + 内容描述）
 model_match:
   - omni

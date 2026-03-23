@@ -1,5 +1,5 @@
 ---
-name: image-design-character
+name: image-design-character-skill
 description: 角色多角度参考网格图提示词规范（1x3宫格：正面/侧面45°/背面），用于 Kling 主体创建的多角度参考输入
 version: 1.0.0
 ---

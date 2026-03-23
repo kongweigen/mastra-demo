@@ -1,5 +1,5 @@
 ---
-name: seedance-1-5-pro-storyboard
+name: seedance-1-5-pro-storyboard-skill
 description: Seedance 1.5 Pro 分镜规范（首帧/首尾帧 + 宫格图分组 + 原生音频）
 model_match:
   - seedance-1-5
